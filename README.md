@@ -15,12 +15,9 @@ This idea for this Project was to reproduce a similar way, but realized pure Web
 - 🎨 Natural UV mapping that follows the shape's own coordinate space
 
 ## Screen Shot (click to visit)
-# Screen Shot (click to visit)
-[![watch](images/screen.jpg)](https://smice-art.github.io/Superformula)
+[![watch](images/screen.jpg)](smice-art.github.io/Johan-Gielis-Superformula)
 
-[![watch](images/screen.jpg)]([https://smice-art.github.io/Superformula](https://smice-art.github.io/Johan-Gielis-Superformula/))
-
-
+## Images
 | Object | Preview |
 | :--- | :--- |
 | <img src="images/1.png" width="250"> | <img src="images/2.png" width="250"> |
