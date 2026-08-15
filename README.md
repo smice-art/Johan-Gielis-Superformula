@@ -20,9 +20,9 @@ This idea for this Project was to reproduce a similar way, but realized pure Web
 ## Images (following soon)
 | Object | Preview |
 | :--- | :--- |
-| <img src="images/1.png" width="250"> | <img src="images/2.png" width="250"> |
-| <img src="images/3.png" width="250"> | <img src="images/4.png" width="250"> |
-| <img src="images/5.png" width="250"> | <img src="images/6.png" width="250"> |
+| <img src="images/s1.JPEG" width="250"> | <img src="images/s6.JPEG" width="250"> |
+| <img src="images/s3.JPEG" width="250"> | <img src="images/s2.JPEG" width="250"> |
+| <img src="images/s4.JPEG" width="250"> | <img src="images/s5.JPEG" width="250"> |
 
 ## Release Notes
 
