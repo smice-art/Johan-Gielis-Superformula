@@ -3,7 +3,7 @@
 ## The Project
 One equation to rule them all — Johan Gielis' Superformula (2003) is a single mathematical formula that can describe an almost infinite range of natural shapes: flowers, shells, starfish, crystals, and things that don't even exist in nature yet.
 
-First I built a fully parametric 3D implementation in Blender Geometry Nodes — entirely procedural, no sculpting, no modeling. Just pure math turned into geometry in real time. You find the Blender Version here:
+First I built a fully parametric 3D implementation in Blender Geometry Nodes — entirely procedural, no sculpting, no modeling. Just pure math turned into geometry in real time. You find the Blender Version [here:] (https://superhivemarket.com/products/gielis-superformula-in-blender)
 
 This idea for this Project was to reproduce a similar way, but realized pure Web-based. Equal on both: Every parameter is live-editable — tweak a number, the shape transforms instantly. From a perfect sphere to a nautilus shell to something completely alien, all within the same node graph.
 
