@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Johan Gielis Superformula 3D Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; color: #fff; font-family: monospace; }
+        #export-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            padding: 10px 15px; background: #333; color: #fff;
+            border: 1px solid #666; cursor: pointer; z-index: 100;
+        }
+        #export-btn:hover { background: #555; }
+    </style>
+    <!-- Import maps polyfill for modular Three.js -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <button id="export-btn">Export OBJ</button>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        let scene, camera, renderer, mesh, gui;
+
+        const presets = {
+            'Default': { m1: 5, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 5, n21: 2, n22: 2, n23: 2, a2: 1, b2: 1 },
+            'Sphere': { m1: 0, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 0, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 },
+            'Starfish': { m1: 5, n11: 0.1, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 1, n21: 0.3, n22: 0.5, n23: 0.5, a2: 1, b2: 1 },
+            'Spiky': { m1: 7, n11: 0.2, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 7, n21: 0.2, n22: 1.7, n23: 1.7, a2: 1, b2: 1 },
+            'Pillow': { m1: 4, n11: 100, n12: 100, n13: 100, a1: 1, b1: 1, m2: 4, n21: 100, n22: 100, n23: 100, a2: 1, b2: 1 },
+            'Flower': { m1: 6, n11: 0.3, n12: 1, n13: 1, a1: 1, b1: 1, m2: 3, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 }
+        };
+
+        const params = {
+            preset: 'Default',
+            m1: 5, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1,
+            m2: 5, n21: 2, n22: 2, n23: 2, a2: 1, b2: 1,
+            detail: 150,
+            material: 'Normal',
+            color: '#00aaff'
+        };
+
+        const materials = {
+            'Normal': new THREE.MeshNormalMaterial({ side: THREE.DoubleSide }),
+            'Standard': new THREE.MeshStandardMaterial({ color: params.color, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide }),
+            'Wireframe': new THREE.MeshBasicMaterial({ color: params.color, wireframe: true, side: THREE.DoubleSide })
+        };
+
+        // Core mathematics for the surface
+        function superFormula(angle, m, n1, n2, n3, a, b) {
+            let t1 = Math.abs((1 / a) * Math.cos(m * angle / 4));
+            t1 = Math.pow(t1, n2);
+            let t2 = Math.abs((1 / b) * Math.sin(m * angle / 4));
+            t2 = Math.pow(t2, n3);
+            let val = t1 + t2;
+            return val === 0 ? 0 : Math.pow(val, -1 / n1);
+        }
+
+        // Build the surface manually using BufferGeometry
+        function generateGeometry() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            const indices = [];
+            const uvs = [];
+
+            const latSteps = Math.floor(params.detail / 2);
+            const lonSteps = params.detail;
+
+            for (let i = 0; i <= latSteps; i++) {
+                const v = i / latSteps;
+                const phi = (v - 0.5) * Math.PI;
+                const r2 = superFormula(phi, params.m2, params.n21, params.n22, params.n23, params.a2, params.b2);
+
+                for (let j = 0; j <= lonSteps; j++) {
+                    const u = j / lonSteps;
+                    const theta = (u - 0.5) * 2 * Math.PI;
+                    const r1 = superFormula(theta, params.m1, params.n11, params.n12, params.n13, params.a1, params.b1);
+
+                    // Spherical coordinates product
+                    const x = r1 * Math.cos(theta) * r2 * Math.cos(phi);
+                    const y = r1 * Math.sin(theta) * r2 * Math.cos(phi);
+                    const z = r2 * Math.sin(phi);
+
+                    vertices.push(x, y, z);
+                    uvs.push(u, v);
+                }
+            }
+
+            for (let i = 0; i < latSteps; i++) {
+                for (let j = 0; j < lonSteps; j++) {
+                    const a = i * (lonSteps + 1) + j;
+                    const b = a + lonSteps + 1;
+                    const c = a + 1;
+                    const d = b + 1;
+                    indices.push(a, b, c);
+                    indices.push(c, b, d);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function updateMesh() {
+            if (mesh) {
+                mesh.geometry.dispose();
+                mesh.geometry = generateGeometry();
+            }
+        }
+
+        function updateMaterial() {
+            if (mesh) {
+                mesh.material = materials[params.material];
+                if (params.material !== 'Normal') {
+                    mesh.material.color.set(params.color);
+                }
+            }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(5, 5, 5);
+            scene.add(dirLight);
+
+            mesh = new THREE.Mesh(generateGeometry(), materials[params.material]);
+            scene.add(mesh);
+
+            initGUI();
+
+            // Setup the Exporter
+            document.getElementById('export-btn').addEventListener('click', () => {
+                const exporter = new OBJExporter();
+                const result = exporter.parse(scene);
+                const blob = new Blob([result], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'superformula_export.obj';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        }
+
+        function initGUI() {
+            gui = new GUI({ title: 'Superformula Generator' });
+
+            gui.add(params, 'preset', Object.keys(presets)).onChange(v => {
+                Object.assign(params, presets[v]);
+                gui.controllersRecursive().forEach(c => c.updateDisplay());
+                updateMesh();
+            });
+
+            const folder1 = gui.addFolder('Shape 1 (Longitude)');
+            folder1.add(params, 'm1', 0, 20).onChange(updateMesh);
+            folder1.add(params, 'n11', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'n12', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'n13', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'a1', 0.1, 5).onChange(updateMesh);
+            folder1.add(params, 'b1', 0.1, 5).onChange(updateMesh);
+
+            const folder2 = gui.addFolder('Shape 2 (Latitude)');
+            folder2.add(params, 'm2', 0, 20).onChange(updateMesh);
+            folder2.add(params, 'n21', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'n22', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'n23', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'a2', 0.1, 5).onChange(updateMesh);
+            folder2.add(params, 'b2', 0.1, 5).onChange(updateMesh);
+
+            const renderFolder = gui.addFolder('Rendering');
+            renderFolder.add(params, 'detail', 32, 512).step(1).onChange(updateMesh);
+            renderFolder.add(params, 'material', Object.keys(materials)).onChange(updateMaterial);
+            renderFolder.addColor(params, 'color').onChange(updateMaterial);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

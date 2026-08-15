@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Superformula Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: sans-serif; }
+        canvas { display: block; }
+    </style>
+    <!-- Three.js and add-ons via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+    <!-- lil-gui for the UI -->
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.18"></script>
+</head>
+<body>
+<script>
+    // 1. Math: Johan Gielis 2D Superformula
+    function evalSuperformula(angle, m, n1, n2, n3, a, b) {
+        let t1 = Math.abs(Math.cos(m * angle / 4) / a);
+        let t2 = Math.abs(Math.sin(m * angle / 4) / b);
+        t1 = Math.pow(t1, n2);
+        t2 = Math.pow(t2, n3);
+        let r = Math.pow(t1 + t2, 1 / n1);
+        if (Math.abs(r) < 1e-6) return 0;
+        return 1 / r;
+    }
+
+    // 2. Scene Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(5, 4, 6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    // Material
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xff5500,
+        metalness: 0.3,
+        roughness: 0.4,
+        side: THREE.DoubleSide,
+        wireframe: false
+    });
+
+    let mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    scene.add(mesh);
+
+    // 3. Parameters and Presets
+    const presets = {
+        'Classic Starfish': { m1: 7, n11: 0.2, n21: 1.7, n31: 1.7, a1: 1, b1: 1, m2: 7, n12: 0.2, n22: 1.7, n32: 1.7, a2: 1, b2: 1 },
+        'Spiky Ball': { m1: 7, n11: 0.3, n21: 0.3, n31: 0.3, a1: 1, b1: 1, m2: 7, n12: 0.3, n22: 0.3, n32: 0.3, a2: 1, b2: 1 },
+        'Alien Gear': { m1: 19, n11: 0.5, n21: 14.6, n31: 14, a1: 1, b1: 1, m2: 19, n12: 0.5, n22: 14.6, n32: 14, a2: 1, b2: 1 },
+        'Smooth Pill': { m1: 4, n11: 2, n21: 2, n31: 2, a1: 1, b1: 1, m2: 4, n12: 2, n22: 2, n32: 2, a2: 1, b2: 1 },
+        'Pinched Vase': { m1: 5, n11: 0.1, n21: 1.7, n31: 1.7, a1: 1, b1: 1, m2: 1, n12: 0.3, n22: 0.5, n32: 0.5, a2: 1, b2: 1 },
+        'Symmetric Attractor': { m1: 12, n11: 0.4, n21: 1.5, n31: 1.5, a1: 1, b1: 1, m2: 6, n12: 0.2, n22: 0.8, n32: 0.8, a2: 1, b2: 1 }
+    };
+
+    const params = {
+        preset: 'Classic Starfish',
+        detail: 150,
+        exportOBJ: function() {
+            const exporter = new THREE.OBJExporter();
+            const result = exporter.parse(mesh);
+            const blob = new Blob([result], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'supershape.obj';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    // Load default preset
+    Object.assign(params, presets['Classic Starfish']);
+
+    // 4. Geometry Generation
+    function updateGeometry() {
+        if (mesh.geometry) mesh.geometry.dispose();
+
+        const uSegments = params.detail;
+        const vSegments = params.detail;
+
+        const vertices = [];
+        const indices = [];
+        const uvs = [];
+
+        for (let i = 0; i <= vSegments; i++) {
+            const v = -Math.PI / 2 + (i / vSegments) * Math.PI; 
+            const r2 = evalSuperformula(v, params.m2, params.n12, params.n22, params.n32, params.a2, params.b2);
+            const cosV = Math.cos(v);
+            const sinV = Math.sin(v);
+
+            for (let j = 0; j <= uSegments; j++) {
+                const u = -Math.PI + (j / uSegments) * 2 * Math.PI; 
+                const r1 = evalSuperformula(u, params.m1, params.n11, params.n21, params.n31, params.a1, params.b1);
+
+                // Spherical product to 3D Cartesian coordinates
+                const x = r1 * Math.cos(u) * r2 * cosV;
+                const y = r1 * Math.sin(u) * r2 * cosV;
+                const z = r2 * sinV;
+
+                vertices.push(x, y, z);
+                uvs.push(j / uSegments, i / vSegments);
+            }
+        }
+
+        // Generate faces
+        for (let i = 0; i < vSegments; i++) {
+            for (let j = 0; j < uSegments; j++) {
+                const a = i * (uSegments + 1) + j;
+                const b = a + uSegments + 1;
+                const c = a + 1;
+                const d = b + 1;
+
+                indices.push(a, b, d);
+                indices.push(a, d, c);
+            }
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+
+        mesh.geometry = geo;
+    }
+
+    // 5. GUI Setup
+    const gui = new lil.GUI({ title: 'Superformula Controls' });
+
+    gui.add(params, 'preset', Object.keys(presets)).name('Presets').onChange(v => {
+        Object.assign(params, presets[v]);
+        gui.folders.forEach(folder => {
+            folder.controllers.forEach(c => c.updateDisplay());
+        });
+        updateGeometry();
+    });
+
+    gui.add(params, 'detail', 50, 400, 1).name('Resolution').onChange(updateGeometry);
+
+    const f1 = gui.addFolder('Shape 1 (Theta - Equator)');
+    f1.add(params, 'm1', 0, 30, 0.1).name('m (Symmetry)').onChange(updateGeometry);
+    f1.add(params, 'n11', 0.01, 20, 0.01).name('n1').onChange(updateGeometry);
+    f1.add(params, 'n21', 0.01, 20, 0.01).name('n2').onChange(updateGeometry);
+    f1.add(params, 'n31', 0.01, 20, 0.01).name('n3').onChange(updateGeometry);
+    f1.add(params, 'a1', 0.1, 5, 0.1).name('a').onChange(updateGeometry);
+    f1.add(params, 'b1', 0.1, 5, 0.1).name('b').onChange(updateGeometry);
+
+    const f2 = gui.addFolder('Shape 2 (Phi - Poles)');
+    f2.add(params, 'm2', 0, 30, 0.1).name('m (Symmetry)').onChange(updateGeometry);
+    f2.add(params, 'n12', 0.01, 20, 0.01).name('n1').onChange(updateGeometry);
+    f2.add(params, 'n22', 0.01, 20, 0.01).name('n2').onChange(updateGeometry);
+    f2.add(params, 'n32', 0.01, 20, 0.01).name('n3').onChange(updateGeometry);
+    f2.add(params, 'a2', 0.1, 5, 0.1).name('a').onChange(updateGeometry);
+    f2.add(params, 'b2', 0.1, 5, 0.1).name('b').onChange(updateGeometry);
+
+    const f3 = gui.addFolder('Material & Lighting');
+    f3.addColor({ color: 0xff5500 }, 'color').onChange(v => mesh.material.color.set(v));
+    f3.add(mesh.material, 'roughness', 0, 1);
+    f3.add(mesh.material, 'metalness', 0, 1);
+    f3.add(mesh.material, 'wireframe');
+
+    gui.add(params, 'exportOBJ').name('Export as .obj');
+
+    // Init
+    updateGeometry();
+
+    // 6. Animation Loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>

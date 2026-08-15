@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Johan Gielis Superformula 3D Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
+        
+        /* Glassmorphism Sidebar */
+        #sidebar {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            bottom: 20px;
+            width: 320px;
+            background: rgba(20, 25, 30, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.5s ease;
+            z-index: 100;
+        }
+
+        #sidebar.collapsed {
+            transform: translateX(-120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Sidebar Header & Toggle */
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #header h2 { margin: 0; font-size: 1.1rem; font-weight: 500; letter-spacing: 0.5px; }
+        
+        #close-btn {
+            background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;
+            opacity: 0.7; transition: opacity 0.2s;
+        }
+        #close-btn:hover { opacity: 1; }
+
+        /* Floating Open Button (visible when collapsed) */
+        #open-btn {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: rgba(20, 25, 30, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 99;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+        #open-btn:hover { transform: scale(1.1); }
+
+        /* GUI Container inner scrolling */
+        #gui-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 10px;
+        }
+
+        /* Make lil-gui blend with our glass panel */
+        .lil-gui { 
+            --background-color: transparent !important;
+            --text-color: #eee !important;
+            --title-background-color: rgba(0,0,0,0.2) !important;
+            --widget-color: rgba(255,255,255,0.1) !important;
+            --hover-color: rgba(255,255,255,0.2) !important;
+            --focus-color: rgba(255,255,255,0.3) !important;
+            width: 100% !important;
+        }
+
+        /* Action Buttons Area */
+        #actions {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        .action-btn:hover { background: rgba(255, 255, 255, 0.15); }
+        .action-btn.active { background: rgba(0, 170, 255, 0.3); border-color: rgba(0, 170, 255, 0.6); }
+
+        /* Custom Scrollbar for the GUI container */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+    </style>
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    
+    <!-- Floating Open Button -->
+    <button id="open-btn">☰</button>
+
+    <!-- Glassmorphic Sidebar -->
+    <div id="sidebar">
+        <div id="header">
+            <h2>Superformula</h2>
+            <button id="close-btn">✖</button>
+        </div>
+        <div id="gui-container"></div>
+        <div id="actions">
+            <button id="auto-rotate-btn" class="action-btn">Auto Rotate: OFF</button>
+            <button id="export-btn" class="action-btn">Export OBJ</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        let scene, camera, renderer, mesh, gui;
+        let isAutoRotating = false;
+
+        const presets = {
+            'Default': { m1: 5, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 5, n21: 2, n22: 2, n23: 2, a2: 1, b2: 1 },
+            'Sphere': { m1: 0, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 0, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 },
+            'Starfish': { m1: 5, n11: 0.1, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 1, n21: 0.3, n22: 0.5, n23: 0.5, a2: 1, b2: 1 },
+            'Spiky': { m1: 7, n11: 0.2, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 7, n21: 0.2, n22: 1.7, n23: 1.7, a2: 1, b2: 1 },
+            'Pillow': { m1: 4, n11: 100, n12: 100, n13: 100, a1: 1, b1: 1, m2: 4, n21: 100, n22: 100, n23: 100, a2: 1, b2: 1 },
+            'Flower': { m1: 6, n11: 0.3, n12: 1, n13: 1, a1: 1, b1: 1, m2: 3, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 },
+            'Crystal': { m1: 4, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 4, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 }
+        };
+
+        const params = {
+            preset: 'Default',
+            m1: 5, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1,
+            m2: 5, n21: 2, n22: 2, n23: 2, a2: 1, b2: 1,
+            detail: 150,
+            material: 'Standard',
+            color: '#00d5ff'
+        };
+
+        const materials = {
+            'Normal': new THREE.MeshNormalMaterial({ side: THREE.DoubleSide }),
+            'Standard': new THREE.MeshStandardMaterial({ 
+                color: params.color, roughness: 0.2, metalness: 0.8, side: THREE.DoubleSide 
+            }),
+            'Wireframe': new THREE.MeshBasicMaterial({ color: params.color, wireframe: true, side: THREE.DoubleSide })
+        };
+
+        // UI Logic
+        const sidebar = document.getElementById('sidebar');
+        const openBtn = document.getElementById('open-btn');
+        const closeBtn = document.getElementById('close-btn');
+        const rotateBtn = document.getElementById('auto-rotate-btn');
+        const exportBtn = document.getElementById('export-btn');
+
+        openBtn.addEventListener('click', () => sidebar.classList.remove('collapsed'));
+        closeBtn.addEventListener('click', () => sidebar.classList.add('collapsed'));
+
+        rotateBtn.addEventListener('click', () => {
+            isAutoRotating = !isAutoRotating;
+            if(isAutoRotating) {
+                rotateBtn.classList.add('active');
+                rotateBtn.innerText = 'Auto Rotate: ON';
+            } else {
+                rotateBtn.classList.remove('active');
+                rotateBtn.innerText = 'Auto Rotate: OFF';
+            }
+        });
+
+        // Math Core
+        function superFormula(angle, m, n1, n2, n3, a, b) {
+            let t1 = Math.abs((1 / a) * Math.cos(m * angle / 4));
+            t1 = Math.pow(t1, n2);
+            let t2 = Math.abs((1 / b) * Math.sin(m * angle / 4));
+            t2 = Math.pow(t2, n3);
+            let val = t1 + t2;
+            return val === 0 ? 0 : Math.pow(val, -1 / n1);
+        }
+
+        // Geometry Generation
+        function generateGeometry() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [], indices = [], uvs = [];
+            const latSteps = Math.floor(params.detail / 2);
+            const lonSteps = params.detail;
+
+            for (let i = 0; i <= latSteps; i++) {
+                const v = i / latSteps;
+                const phi = (v - 0.5) * Math.PI;
+                const r2 = superFormula(phi, params.m2, params.n21, params.n22, params.n23, params.a2, params.b2);
+
+                for (let j = 0; j <= lonSteps; j++) {
+                    const u = j / lonSteps;
+                    const theta = (u - 0.5) * 2 * Math.PI;
+                    const r1 = superFormula(theta, params.m1, params.n11, params.n12, params.n13, params.a1, params.b1);
+
+                    const x = r1 * Math.cos(theta) * r2 * Math.cos(phi);
+                    const y = r1 * Math.sin(theta) * r2 * Math.cos(phi);
+                    const z = r2 * Math.sin(phi);
+
+                    vertices.push(x, y, z);
+                    uvs.push(u, v);
+                }
+            }
+
+            for (let i = 0; i < latSteps; i++) {
+                for (let j = 0; j < lonSteps; j++) {
+                    const a = i * (lonSteps + 1) + j;
+                    const b = a + lonSteps + 1;
+                    const c = a + 1;
+                    const d = b + 1;
+                    indices.push(a, b, c);
+                    indices.push(c, b, d);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function updateMesh() {
+            if (mesh) {
+                mesh.geometry.dispose();
+                mesh.geometry = generateGeometry();
+            }
+        }
+
+        function updateMaterial() {
+            if (mesh) {
+                mesh.material = materials[params.material];
+                if (params.material !== 'Normal') {
+                    mesh.material.color.set(params.color);
+                }
+            }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 6);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            // Subtle radial gradient background via canvas CSS
+            renderer.domElement.style.background = 'radial-gradient(circle at center, #2a2a35 0%, #0a0a0a 100%)';
+            document.body.appendChild(renderer.domElement);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting setup for better material reflection
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+            dirLight.position.set(5, 5, 5);
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0x0055ff, 1);
+            fillLight.position.set(-5, -2, -5);
+            scene.add(fillLight);
+
+            mesh = new THREE.Mesh(generateGeometry(), materials[params.material]);
+            scene.add(mesh);
+
+            initGUI();
+
+            exportBtn.addEventListener('click', () => {
+                const exporter = new OBJExporter();
+                const result = exporter.parse(scene);
+                const blob = new Blob([result], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'superformula.obj';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        }
+
+        function initGUI() {
+            // Target our specific glass container instead of document body
+            gui = new GUI({ container: document.getElementById('gui-container') });
+
+            gui.add(params, 'preset', Object.keys(presets)).onChange(v => {
+                Object.assign(params, presets[v]);
+                gui.controllersRecursive().forEach(c => c.updateDisplay());
+                updateMesh();
+            });
+
+            const folder1 = gui.addFolder('Shape 1 (Longitude)');
+            folder1.add(params, 'm1', 0, 20).onChange(updateMesh);
+            folder1.add(params, 'n11', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'n12', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'n13', 0.1, 100).onChange(updateMesh);
+            folder1.add(params, 'a1', 0.1, 5).onChange(updateMesh);
+            folder1.add(params, 'b1', 0.1, 5).onChange(updateMesh);
+
+            const folder2 = gui.addFolder('Shape 2 (Latitude)');
+            folder2.add(params, 'm2', 0, 20).onChange(updateMesh);
+            folder2.add(params, 'n21', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'n22', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'n23', 0.1, 100).onChange(updateMesh);
+            folder2.add(params, 'a2', 0.1, 5).onChange(updateMesh);
+            folder2.add(params, 'b2', 0.1, 5).onChange(updateMesh);
+
+            const renderFolder = gui.addFolder('Rendering Options');
+            renderFolder.add(params, 'detail', 32, 512).step(1).onChange(updateMesh);
+            renderFolder.add(params, 'material', Object.keys(materials)).onChange(updateMaterial);
+            renderFolder.addColor(params, 'color').onChange(updateMaterial);
+            
+            // Expand folders by default
+            folder1.open();
+            folder2.open();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isAutoRotating && mesh) {
+                mesh.rotation.y += 0.005;
+                mesh.rotation.x += 0.002;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

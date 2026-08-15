@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Superformula Engine V1</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Inter', sans-serif; color: #fff; }
+        
+        /* Main UI Container Styling - matching the screenshot */
+        #ui-wrapper {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            display: flex;
+            align-items: flex-start;
+            z-index: 100;
+        }
+
+        #sidebar {
+            width: 340px;
+            background: #20222a;
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+            max-height: calc(100vh - 40px);
+        }
+
+        #sidebar.collapsed {
+            transform: translateX(-110%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Toggle Button */
+        #toggle-btn {
+            background: #20222a;
+            border: 1px solid #333;
+            color: #00e5ff;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            margin-left: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #toggle-btn:hover { background: #2a2d37; }
+        #toggle-btn.collapsed { transform: rotate(180deg); }
+
+        /* Custom UI Header */
+        #ui-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+        }
+        #ui-header h2 {
+            margin: 0;
+            color: #00e5ff;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Internal Scroll Area for GUI */
+        #gui-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Overriding lil-gui to match the dark/teal theme */
+        .lil-gui { 
+            --background-color: transparent !important;
+            --text-color: #a0aabf !important;
+            --title-background-color: #181a20 !important;
+            --widget-color: #121318 !important;
+            --hover-color: #2a2d37 !important;
+            --focus-color: #00e5ff !important;
+            --number-color: #fff !important;
+            --string-color: #fff !important;
+            --font-family: 'Inter', sans-serif !important;
+            width: 100% !important;
+        }
+        .lil-gui .title { font-weight: 600; color: #fff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .lil-gui .controller .name { font-size: 12px; }
+        
+        /* Sliders */
+        .lil-gui .slider { background-color: #333 !important; border-radius: 4px; height: 6px !important; margin-top: 6px;}
+        .lil-gui .slider .fill { background-color: #00e5ff !important; border-radius: 4px; }
+        
+        /* Inputs */
+        .lil-gui input[type="text"], .lil-gui input[type="number"] {
+            background: #121318; border: 1px solid #444; border-radius: 4px; color: #fff; padding: 4px; font-family: monospace;
+        }
+        .lil-gui input:focus { border-color: #00e5ff; }
+
+        /* Custom Action Area */
+        #custom-actions {
+            padding: 15px 20px;
+            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Upload Button Area */
+        .upload-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #181a20; padding: 10px; border-radius: 6px; border: 1px solid #333;}
+        .upload-text { font-size: 11px; color: #a0aabf; line-height: 1.4; }
+        .upload-text strong { color: #fff; display: block; font-size: 12px; text-transform: uppercase;}
+        
+        .btn-small {
+            background: #333; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; transition: 0.2s;
+        }
+        .btn-small:hover { background: #444; color: #00e5ff; }
+        
+        input[type="file"] { display: none; }
+
+        /* Giant Teal Export Button */
+        #export-btn {
+            background: #00e5ff;
+            color: #000;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 14px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2);
+        }
+        #export-btn:hover {
+            background: #00ffcc;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.4);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+    </style>
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    
+    <div id="ui-wrapper">
+        <div id="sidebar">
+            <div id="ui-header">
+                <h2>Superformula Engine V1</h2>
+            </div>
+            
+            <div id="gui-container"></div>
+            
+            <div id="custom-actions">
+                <div class="upload-row">
+                    <div class="upload-text">
+                        <strong>Upload</strong>
+                        Custom HDRI Environment
+                    </div>
+                    <label for="hdri-upload" class="btn-small">BROWSE</label>
+                    <input type="file" id="hdri-upload" accept=".hdr,.jpg,.jpeg,.png" />
+                </div>
+                <div style="font-size: 11px; color: #a0aabf; margin-bottom: -5px; text-transform: uppercase; font-weight: bold;">Model Export</div>
+                <button id="export-btn">Export As OBJ</button>
+            </div>
+        </div>
+        <button id="toggle-btn">◀</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+        let scene, camera, renderer, mesh, gui, pmremGenerator;
+        let isAutoRotating = true;
+
+        const presets = {
+            'Exotic Flower, m=12': { m1: 12, n11: 1, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 12, n21: 1, n22: 1.7, n23: 1.7, a2: 1, b2: 1 },
+            'Smooth Orb': { m1: 0, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 0, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 },
+            'Crystal Shard': { m1: 4, n11: 1, n12: 1, n13: 1, a1: 1, b1: 1, m2: 4, n21: 1, n22: 1, n23: 1, a2: 1, b2: 1 },
+            'Starfish Base': { m1: 5, n11: 0.1, n12: 1.7, n13: 1.7, a1: 1, b1: 1, m2: 1, n21: 0.3, n22: 0.5, n23: 0.5, a2: 1, b2: 1 }
+        };
+
+        const hdriPresets = {
+            'Royal Esplanade': 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/royal_esplanade_1k.hdr',
+            'Venice Sunset': 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/venice_sunset_1k.hdr',
+            'Quarry Cloudy': 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/quarry_01_1k.hdr',
+            'None (Studio Lights)': 'none'
+        };
+
+        const params = {
+            preset: 'Exotic Flower, m=12',
+            m1: 12, n11: 1, n12: 1.7, n13: 1.7, a1: 1, b1: 1,
+            m2: 12, n21: 1, n22: 1.7, n23: 1.7, a2: 1, b2: 1,
+            detail: 200,
+            hdri: 'Royal Esplanade',
+            color: '#aaddff',
+            metalness: 1.0,
+            roughness: 0.15,
+            autoRotate: true
+        };
+
+        const material = new THREE.MeshStandardMaterial({ 
+            color: params.color, 
+            roughness: params.roughness, 
+            metalness: params.metalness, 
+            side: THREE.DoubleSide 
+        });
+
+        // UI Toggling
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggle-btn');
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            toggleBtn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        });
+
+        // Math Core
+        function superFormula(angle, m, n1, n2, n3, a, b) {
+            let t1 = Math.abs((1 / a) * Math.cos(m * angle / 4));
+            t1 = Math.pow(t1, n2);
+            let t2 = Math.abs((1 / b) * Math.sin(m * angle / 4));
+            t2 = Math.pow(t2, n3);
+            let val = t1 + t2;
+            return val === 0 ? 0 : Math.pow(val, -1 / n1);
+        }
+
+        // Geometry Gen
+        function generateGeometry() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [], indices = [], uvs = [];
+            const latSteps = Math.floor(params.detail / 2);
+            const lonSteps = params.detail;
+
+            for (let i = 0; i <= latSteps; i++) {
+                const v = i / latSteps;
+                const phi = (v - 0.5) * Math.PI;
+                const r2 = superFormula(phi, params.m2, params.n21, params.n22, params.n23, params.a2, params.b2);
+
+                for (let j = 0; j <= lonSteps; j++) {
+                    const u = j / lonSteps;
+                    const theta = (u - 0.5) * 2 * Math.PI;
+                    const r1 = superFormula(theta, params.m1, params.n11, params.n12, params.n13, params.a1, params.b1);
+
+                    const x = r1 * Math.cos(theta) * r2 * Math.cos(phi);
+                    const y = r1 * Math.sin(theta) * r2 * Math.cos(phi);
+                    const z = r2 * Math.sin(phi);
+
+                    vertices.push(x, y, z);
+                    uvs.push(u, v);
+                }
+            }
+
+            for (let i = 0; i < latSteps; i++) {
+                for (let j = 0; j < lonSteps; j++) {
+                    const a = i * (lonSteps + 1) + j;
+                    const b = a + lonSteps + 1;
+                    const c = a + 1;
+                    const d = b + 1;
+                    indices.push(a, b, c);
+                    indices.push(c, b, d);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function updateMesh() {
+            if (mesh) {
+                mesh.geometry.dispose();
+                mesh.geometry = generateGeometry();
+            }
+        }
+
+        // Environment Loading
+        function loadHDRI(url) {
+            if (url === 'none') {
+                scene.environment = null;
+                return;
+            }
+            new RGBELoader().load(url, (texture) => {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                texture.dispose();
+            }, undefined, (err) => {
+                console.error('Error loading HDRI:', err);
+            });
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 7);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            // Dark gray background
+            scene.background = new THREE.Color('#1a1c23');
+            document.body.appendChild(renderer.domElement);
+
+            pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Fallback studio lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(5, 5, 5);
+            scene.add(dirLight);
+            const fillLight = new THREE.DirectionalLight(0x00e5ff, 0.8);
+            fillLight.position.set(-5, -2, -5);
+            scene.add(fillLight);
+
+            mesh = new THREE.Mesh(generateGeometry(), material);
+            scene.add(mesh);
+
+            // Load initial HDRI
+            loadHDRI(hdriPresets[params.hdri]);
+
+            initGUI();
+
+            // Handle Custom HDRI Upload
+            document.getElementById('hdri-upload').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const blobUrl = URL.createObjectURL(file);
+                loadHDRI(blobUrl);
+                // We don't revoke URL immediately so Three.js can fetch it
+            });
+
+            // Handle OBJ Export
+            document.getElementById('export-btn').addEventListener('click', () => {
+                const exporter = new OBJExporter();
+                const result = exporter.parse(scene);
+                const blob = new Blob([result], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'superformula_model.obj';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        }
+
+        function initGUI() {
+            gui = new GUI({ container: document.getElementById('gui-container') });
+
+            gui.add(params, 'preset', Object.keys(presets)).name('Superformula Presets').onChange(v => {
+                Object.assign(params, presets[v]);
+                gui.controllersRecursive().forEach(c => c.updateDisplay());
+                updateMesh();
+            });
+
+            const folder1 = gui.addFolder('Shape 1 (Longitude)');
+            folder1.add(params, 'm1', 0, 20).onChange(updateMesh).name('Param m1');
+            folder1.add(params, 'n11', 0.1, 50).onChange(updateMesh).name('Param n1_1');
+            folder1.add(params, 'n12', 0.1, 50).onChange(updateMesh).name('Param n1_2');
+            folder1.add(params, 'n13', 0.1, 50).onChange(updateMesh).name('Param n1_3');
+            folder1.add(params, 'a1', 0.1, 5).onChange(updateMesh).name('Param a1');
+            folder1.add(params, 'b1', 0.1, 5).onChange(updateMesh).name('Param b1');
+
+            const folder2 = gui.addFolder('Shape 2 (Latitude)');
+            folder2.add(params, 'm2', 0, 20).onChange(updateMesh).name('Param m2');
+            folder2.add(params, 'n21', 0.1, 50).onChange(updateMesh).name('Param n2_1');
+            folder2.add(params, 'n22', 0.1, 50).onChange(updateMesh).name('Param n2_2');
+            folder2.add(params, 'n23', 0.1, 50).onChange(updateMesh).name('Param n2_3');
+            folder2.add(params, 'a2', 0.1, 5).onChange(updateMesh).name('Param a2');
+            folder2.add(params, 'b2', 0.1, 5).onChange(updateMesh).name('Param b2');
+
+            const matFolder = gui.addFolder('Material & Environment');
+            matFolder.add(params, 'hdri', Object.keys(hdriPresets)).name('HDRI Presets').onChange(v => loadHDRI(hdriPresets[v]));
+            matFolder.addColor(params, 'color').name('Base Color').onChange(c => material.color.set(c));
+            matFolder.add(params, 'metalness', 0, 1).name('Metalness').onChange(v => material.metalness = v);
+            matFolder.add(params, 'roughness', 0, 1).name('Roughness').onChange(v => material.roughness = v);
+            
+            const sysFolder = gui.addFolder('System Settings');
+            sysFolder.add(params, 'detail', 50, 400).step(1).name('Mesh Detail').onChange(updateMesh);
+            sysFolder.add(params, 'autoRotate').name('Auto Rotate');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (params.autoRotate && mesh) {
+                mesh.rotation.y += 0.005;
+                mesh.rotation.x += 0.002;
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
