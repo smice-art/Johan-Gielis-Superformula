@@ -8,11 +8,11 @@ First I built a fully parametric 3D implementation in Blender Geometry Nodes —
 This idea for this Project was to reproduce a similar way, but realized pure Web-based. Equal on both: Every parameter is live-editable — tweak a number, the shape transforms instantly. From a perfect sphere to a nautilus shell to something completely alien, all within the same node graph.
 
 ## Key Features
-🔵 Two independent superformulas combined via a spherical product 
-🟠 Sphere ↔ Torus topology switch for ring-based forms 
-🟤 Shell mode with Archimedes and Logarithmic spirals 
-🐚 Shell_Turns parameter to control how many revolutions the shell grows 
-🎨 Natural UV mapping that follows the shape's own coordinate space
+- 🔵 Two independent superformulas combined via a spherical product 
+- 🟠 Sphere ↔ Torus topology switch for ring-based forms 
+- 🟤 Shell mode with Archimedes and Logarithmic spirals 
+- 🐚 Shell_Turns parameter to control how many revolutions the shell grows 
+- 🎨 Natural UV mapping that follows the shape's own coordinate space
 
 ## Screen Shot (click to visit)
 [![watch](images/screen.jpg)](https://smice-art.github.io/Superformula)
