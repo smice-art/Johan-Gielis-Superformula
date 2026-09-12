@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="images/various5.jpg" alt="gilies width="100%">
+</p>
+
+# Info ⚠️
+Please excuse me regarding the correct mathematical terms; I am unfortunately not a mathematician, so they are sometimes certainly not correct. 
+
 # Supershapes / SuperFormula
 
 ## The Project
@@ -17,7 +24,7 @@ This idea for this Project was to reproduce a similar way, but realized pure Web
 ## Screen Shot (click to visit)
 [![watch](images/screen.jpg)](https://smice-art.github.io/Johan-Gielis-Superformula/)
 
-## Images (following soon)
+## Images
 | Object | Preview |
 | :--- | :--- |
 | <img src="images/s1.JPEG" width="250"> | <img src="images/s6.JPEG" width="250"> |
