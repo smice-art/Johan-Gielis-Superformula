@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="images/various5.jpg" alt="gilies width="100%">
+</p>
+
+# Info ⚠️
+Please excuse me regarding the correct mathematical terms; I am unfortunately not a mathematician, so they are sometimes certainly not correct. 
+
 # Supershapes / SuperFormula
 
 ## The Project
