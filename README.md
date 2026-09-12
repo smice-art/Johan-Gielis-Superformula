@@ -17,7 +17,7 @@ This idea for this Project was to reproduce a similar way, but realized pure Web
 ## Screen Shot (click to visit)
 [![watch](images/screen.jpg)](https://smice-art.github.io/Johan-Gielis-Superformula/)
 
-## Images (following soon)
+## Images
 | Object | Preview |
 | :--- | :--- |
 | <img src="images/s1.JPEG" width="250"> | <img src="images/s6.JPEG" width="250"> |
